@@ -1,6 +1,7 @@
+from dotenv import load_dotenv
 import os
 
-
+load_dotenv('/etc/chatapp/env.conf')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
