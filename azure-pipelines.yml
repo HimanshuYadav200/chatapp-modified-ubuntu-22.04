@@ -1,56 +1,55 @@
 trigger:
-  - main
+- main
 
-# 1) either use a Microsoft-hosted agent:
 pool:
-   vmImage: 'ubuntu-22.04'
-
-#  or your own self-hosted pool:
-#pool:
-#  name: 'remote-agent'     # ← replace with the exact name from Project Settings → Agent pools
+  name: 'remote-agent'   # or your self-hosted agent pool
 
 variables:
   APP_DIR: '/app'
 
-stages:
-- stage: Deploy
-  jobs:
-  - job: PushAndDeploy
-    steps:
+steps:
+# 1) Checkout your repo
+- checkout: self
 
-      # 2) Get your code
-      - checkout: self
+# 2) Copy everything to the remote VM
+- task: CopyFilesOverSSH@0
+  displayName: 'Copy code to backend VM'
+  inputs:
+    sshEndpoint: 'backendvm-ssh'       # the service connection you just created
+    sourceFolder: '$(Build.SourcesDirectory)'
+    contents: |
+      **/*
+    targetFolder: '$(APP_DIR)'
+    cleanTargetFolder: true
 
-      # 3) Copy everything to /app on the backend VM
-      - task: CopyFilesOverSSH@0
-        name: PushCode
-        inputs:
-          sshEndpoint: 'backendvm-ssh'     # ← the name of the SSH service connection you created
-          sourceFolder: '$(Build.SourcesDirectory)'
-          contents: '**'                    # everything
-          targetFolder: '$(APP_DIR)'
-          cleanTargetFolder: true           # optional: wipe /app before copying
+# 3) Install deps, migrate, restart
+- task: SSH@0
+  displayName: 'Install Dependencies on backend VM'
+  inputs:
+    sshEndpoint: 'backendvm-ssh'
+    runOptions: 'commands'
+    commands: |
+      set -e
+      cd $(APP_DIR)
+      source venv/bin/activate
+      pip install -r requirements.txt
 
-      # 4) Run your setup & migrations remotely
-      - task: SSH@0
-        name: ConfigureBackend
-        inputs:
-          sshEndpoint: 'backendvm-ssh'
-          runOptions: 'commands'
-          # chain your multiple commands in one invocation:
-          commands: |
-            set -e
-            cd $(APP_DIR)
-            source venv/bin/activate
-            pip install -r requirements.txt
+- task: SSH@0
+  displayName: 'Run Migrations on backend VM'
+  inputs:
+    sshEndpoint: 'backendvm-ssh'
+    runOptions: 'commands'
+    commands: |
+      set -e
+      cd $(APP_DIR)/fundoo
+      source ../venv/bin/activate
+      python3 manage.py makemigrations
+      python3 manage.py migrate
 
-            cd fundoo
-            source ../venv/bin/activate
-            python3 manage.py makemigrations
-            python3 manage.py migrate
-
-            sudo systemctl restart chatapp.service
-
-      # 5) (optional) you can publish logs, artifacts, etc.
-
-    # you can add notifications or further steps here
+- task: SSH@0
+  displayName: 'Restart chatapp.service'
+  inputs:
+    sshEndpoint: 'backendvm-ssh'
+    runOptions: 'commands'
+    commands: |
+      sudo systemctl restart chatapp.service
