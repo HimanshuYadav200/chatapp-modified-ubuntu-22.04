@@ -1,0 +1,63 @@
+trigger:
+  - main
+
+pool:
+  name: remote-agent   # your self-hosted pool
+
+variables:
+  # This must match the name of the SSH service connection you created
+  SSH_CONNECTION: 'backendvm-ssh'
+  APP_DIR: '/app'
+
+stages:
+
+  - stage: Deploy
+    displayName: Deploy to Backend VM
+    jobs:
+      - job: PushAndDeploy
+        displayName: Copy & Deploy ChatApp
+        steps:
+
+          # 1) Checkout your code
+          - checkout: self
+
+          # 2) Copy code to the VM via the SSH service connection
+          - task: SSH@0
+            displayName: Copy code to $(APP_DIR)
+            inputs:
+              sshEndpoint: '$(SSH_CONNECTION)'
+              runOptions: 'scp'
+              sourceFolder: '$(Build.SourcesDirectory)'
+              targetFolder: '$(APP_DIR)'
+
+          # 3) Install pip requirements
+          - task: SSH@0
+            displayName: Install Python dependencies
+            inputs:
+              sshEndpoint: '$(SSH_CONNECTION)'
+              runOptions: 'inline'
+              inline: |
+                cd $(APP_DIR)
+                source venv/bin/activate
+                pip install -r requirements.txt
+
+          # 4) Run Django migrations
+          - task: SSH@0
+            displayName: Run migrations
+            inputs:
+              sshEndpoint: '$(SSH_CONNECTION)'
+              runOptions: 'inline'
+              inline: |
+                cd $(APP_DIR)/fundoo
+                source ../venv/bin/activate
+                python3 manage.py makemigrations
+                python3 manage.py migrate
+
+          # 5) Restart your systemd service
+          - task: SSH@0
+            displayName: Restart chatapp.service
+            inputs:
+              sshEndpoint: '$(SSH_CONNECTION)'
+              runOptions: 'inline'
+              inline: |
+                sudo systemctl restart chatapp.service
