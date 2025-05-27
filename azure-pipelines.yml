@@ -1,54 +1,56 @@
 trigger:
   - main
 
+# 1) either use a Microsoft-hosted agent:
 pool:
-  vmImage: 'ubuntu-22.04' # e.g. “Hosted Ubuntu 2204”
+   vmImage: 'ubuntu-22.04'
+
+#  or your own self-hosted pool:
+#pool:
+#  name: 'remote-agent'     # ← replace with the exact name from Project Settings → Agent pools
 
 variables:
   APP_DIR: '/app'
 
 stages:
 - stage: Deploy
-  displayName: 🚀 Deploy to Backend VM
   jobs:
   - job: PushAndDeploy
-    displayName: Copy, Install & Migrate
     steps:
 
-    # 1) Copy code up to the VM
-    - task: SSHUpload@0
-      displayName: 'Copy application files to backend'
-      inputs:
-        sshEndpoint: 'backendvm-ssh'   # your Service Connection name
-        sourceFolder: '$(Build.SourcesDirectory)'  
-        targetFolder: '$(APP_DIR)'
+      # 2) Get your code
+      - checkout: self
 
-    # 2) Install Python deps
-    - task: SSH@0
-      displayName: 'Install Python dependencies'
-      inputs:
-        sshEndpoint: 'backendvm-ssh'
-        runOptions: 'commands'
-        commands: |
-          source /app/venv/bin/activate
-          pip install -r /app/requirements.txt
+      # 3) Copy everything to /app on the backend VM
+      - task: CopyFilesOverSSH@0
+        name: PushCode
+        inputs:
+          sshEndpoint: 'backendvm-ssh'     # ← the name of the SSH service connection you created
+          sourceFolder: '$(Build.SourcesDirectory)'
+          contents: '**'                    # everything
+          targetFolder: '$(APP_DIR)'
+          cleanTargetFolder: true           # optional: wipe /app before copying
 
-    # 3) Run Django migrations
-    - task: SSH@0
-      displayName: 'Run Django makemigrations & migrate'
-      inputs:
-        sshEndpoint: 'backendvm-ssh'
-        runOptions: 'commands'
-        commands: |
-          source /app/venv/bin/activate
-          cd /app/fundoo
-          python3 manage.py makemigrations
-          python3 manage.py migrate
+      # 4) Run your setup & migrations remotely
+      - task: SSH@0
+        name: ConfigureBackend
+        inputs:
+          sshEndpoint: 'backendvm-ssh'
+          runOptions: 'commands'
+          # chain your multiple commands in one invocation:
+          commands: |
+            set -e
+            cd $(APP_DIR)
+            source venv/bin/activate
+            pip install -r requirements.txt
 
-    # 4) Restart systemd service
-    - task: SSH@0
-      displayName: 'Restart chatapp.service'
-      inputs:
-        sshEndpoint: 'backendvm-ssh'
-        runOptions: 'commands'
-        commands: sudo systemctl restart chatapp.service
+            cd fundoo
+            source ../venv/bin/activate
+            python3 manage.py makemigrations
+            python3 manage.py migrate
+
+            sudo systemctl restart chatapp.service
+
+      # 5) (optional) you can publish logs, artifacts, etc.
+
+    # you can add notifications or further steps here
