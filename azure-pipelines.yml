@@ -1,0 +1,54 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-22.04' # e.g. “Hosted Ubuntu 2204”
+
+variables:
+  APP_DIR: '/app'
+
+stages:
+- stage: Deploy
+  displayName: 🚀 Deploy to Backend VM
+  jobs:
+  - job: PushAndDeploy
+    displayName: Copy, Install & Migrate
+    steps:
+
+    # 1) Copy code up to the VM
+    - task: SSHUpload@0
+      displayName: 'Copy application files to backend'
+      inputs:
+        sshEndpoint: 'backendvm-ssh'   # your Service Connection name
+        sourceFolder: '$(Build.SourcesDirectory)'  
+        targetFolder: '$(APP_DIR)'
+
+    # 2) Install Python deps
+    - task: SSH@0
+      displayName: 'Install Python dependencies'
+      inputs:
+        sshEndpoint: 'backendvm-ssh'
+        runOptions: 'commands'
+        commands: |
+          source /app/venv/bin/activate
+          pip install -r /app/requirements.txt
+
+    # 3) Run Django migrations
+    - task: SSH@0
+      displayName: 'Run Django makemigrations & migrate'
+      inputs:
+        sshEndpoint: 'backendvm-ssh'
+        runOptions: 'commands'
+        commands: |
+          source /app/venv/bin/activate
+          cd /app/fundoo
+          python3 manage.py makemigrations
+          python3 manage.py migrate
+
+    # 4) Restart systemd service
+    - task: SSH@0
+      displayName: 'Restart chatapp.service'
+      inputs:
+        sshEndpoint: 'backendvm-ssh'
+        runOptions: 'commands'
+        commands: sudo systemctl restart chatapp.service
