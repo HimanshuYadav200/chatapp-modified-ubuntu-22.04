@@ -27,7 +27,7 @@ stages:
         displayName: Copy code to $(APP_DIR)
         inputs:
           sshEndpoint: $(SSH_CONNECTION)
-          sourceFolder: '$(Pipeline.Workspace)/ChatAppBuild/chatapp-code'
+          sourceFolder: '$(Pipeline.Workspace)/ChatAppBuild/chatapp-code' # in $(Pipeline.Workspace) release agent places the downloded artifact and other pipeline data
           contents: '**'
           targetFolder: '$(APP_DIR)'
 
