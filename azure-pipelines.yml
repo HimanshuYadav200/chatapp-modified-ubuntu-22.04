@@ -2,7 +2,7 @@ trigger:
   - main
 
 pool:
-  name: backend-agent
+  name: backend-agent-pool
 
 variables:
   SSH_CONNECTION: 'backendvm-ssh'
