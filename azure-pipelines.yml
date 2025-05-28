@@ -2,7 +2,7 @@ trigger:
   - main
 
 pool:
-  name: remote-agent
+  name: backend-agent
 
 variables:
   SSH_CONNECTION: 'backendvm-ssh'
@@ -28,51 +28,4 @@ stages:
           contents: '**'
           targetFolder: '$(APP_DIR)'
 
-      # 3) ensure venv
-      - task: SSH@0
-        displayName: Ensure Python venv exists
-        inputs:
-          sshEndpoint: $(SSH_CONNECTION)
-          runOptions: inline
-          inline: |
-            set -e
-            cd $(APP_DIR)
-            if [ ! -d venv ]; then
-              python3 -m venv venv
-            fi
-
-      # 4) install deps
-      - task: SSH@0
-        displayName: Install Python dependencies
-        inputs:
-          sshEndpoint: $(SSH_CONNECTION)
-          runOptions: inline
-          inline: |
-            set -e
-            cd $(APP_DIR)
-            source venv/bin/activate
-            pip install -r requirements.txt
-            deactivate
-
-      # 5) migrations
-      - task: SSH@0
-        displayName: Run Django migrations
-        inputs:
-          sshEndpoint: $(SSH_CONNECTION)
-          runOptions: inline
-          inline: |
-            set -e
-            cd $(APP_DIR)/fundoo
-            source ../venv/bin/activate
-            python3 manage.py makemigrations
-            python3 manage.py migrate
-            deactivate
-
-      # 6) restart service
-      - task: SSH@0
-        displayName: Restart chatapp service
-        inputs:
-          sshEndpoint: $(SSH_CONNECTION)
-          runOptions: inline
-          inline: |
-            sudo systemctl restart $(SERVICE_NAME)
+      
