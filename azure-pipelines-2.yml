@@ -1,4 +1,3 @@
-# File: .azure/pipelines/build-pipeline.yml
 trigger:
   branches:
     include:
@@ -21,14 +20,10 @@ stages:
       - checkout: self
         clean: true
 
-      # (Optional) run tests or lint here
-      # - script: pytest
-      #   displayName: 'Run tests'
 
-      # Publish everything as a pipeline artifact
       - task: PublishPipelineArtifact@1
         displayName: 'Publish app code artifact'
         inputs:
-          targetPath: '$(Build.SourcesDirectory)'   # your repo root
+          targetPath: '$(Build.SourcesDirectory)'   
           artifact: 'chatapp-code'
           publishLocation: 'pipeline'
