@@ -2,7 +2,7 @@
 resources:
   pipelines:
     - pipeline: ChatAppBuild      # an alias you give it
-      source: BuildPipeline       # <-- the *name* of your Build pipeline in Azure DevOps
+      source: Build Pipeline       # <-- the *name* of your Build pipeline in Azure DevOps
       trigger: true               # auto-trigger whenever that pipeline succeeds
 
 pool:
