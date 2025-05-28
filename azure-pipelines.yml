@@ -40,3 +40,23 @@ stages:
             source venv/bin/activate
             pip3 install -r requirements.txt
             deactivate
+
+      - task: SSH@0
+        inputs:
+          sshEndpoint: 'backendvm-ssh'
+          runOptions: 'inline'
+          inline: |
+            cd $(APP_DIR)
+            source venv/bin/activate
+            cd fundoo
+            python3 manage.py migrate
+            cd ..
+            deactivate
+
+      - task: SSH@0
+        inputs:
+          sshEndpoint: 'backendvm-ssh'
+          runOptions: 'inline'
+          inline: |
+            sudo systemctl restart $(SERVICE_NAME)
+           
