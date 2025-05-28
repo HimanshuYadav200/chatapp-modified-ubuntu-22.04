@@ -1,9 +1,8 @@
-# File: .azure/pipelines/release-pipeline.yml
 resources:
   pipelines:
-    - pipeline: ChatAppBuild      # an alias you give it
-      source: Build Pipeline       # <-- the *name* of your Build pipeline in Azure DevOps
-      trigger: true               # auto-trigger whenever that pipeline succeeds
+    - pipeline: ChatAppBuild      
+      source: Build Pipeline       
+      trigger: true               
 
 pool:
   name: remote-agrnt-pool
@@ -21,11 +20,9 @@ stages:
     displayName: Copy & Deploy ChatApp
     steps:
 
-      # Download the artifact from the Build pipeline
       - download: ChatAppBuild
         artifact: chatapp-code
 
-      # Copy code to the target VM
       - task: CopyFilesOverSSH@0
         displayName: Copy code to $(APP_DIR)
         inputs:
@@ -34,7 +31,6 @@ stages:
           contents: '**'
           targetFolder: '$(APP_DIR)'
 
-      # Install requirements
       - task: SSH@0
         displayName: Install requirements
         inputs:
@@ -46,7 +42,6 @@ stages:
             pip3 install -r requirements.txt
             deactivate
 
-      # Run migrations
       - task: SSH@0
         displayName: Run Django migrations
         inputs:
@@ -59,7 +54,6 @@ stages:
             python3 manage.py migrate
             deactivate
 
-      # Restart the service
       - task: SSH@0
         displayName: Restart chatapp service
         inputs:
