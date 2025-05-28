@@ -1,55 +1,78 @@
 trigger:
-- main
+  - main
 
 pool:
-  name: 'remote-agent'   # or your self-hosted agent pool
+  name: remote-agent
 
 variables:
-  APP_DIR: '/app'
+  SSH_CONNECTION: 'backendvm-ssh'
+  APP_DIR:        '/app'
+  SERVICE_NAME:   'chatapp.service'
 
-steps:
-# 1) Checkout your repo
-- checkout: self
+stages:
+- stage: Deploy
+  jobs:
+  - job: PushAndDeploy
+    displayName: Copy & Deploy ChatApp
+    steps:
 
-# 2) Copy everything to the remote VM
-- task: CopyFilesOverSSH@0
-  displayName: 'Copy code to backend VM'
-  inputs:
-    sshEndpoint: 'backendvm-ssh'       # the service connection you just created
-    sourceFolder: '$(Build.SourcesDirectory)'
-    contents: |
-      **/*
-    targetFolder: '$(APP_DIR)'
-    cleanTargetFolder: true
+      # 1) checkout
+      - checkout: self
 
-# 3) Install deps, migrate, restart
-- task: SSH@0
-  displayName: 'Install Dependencies on backend VM'
-  inputs:
-    sshEndpoint: 'backendvm-ssh'
-    runOptions: 'commands'
-    commands: |
-      set -e
-      cd $(APP_DIR)
-      source venv/bin/activate
-      pip install -r requirements.txt
+      # 2) copy all files to /app
+      - task: CopyFilesOverSSH@0
+        displayName: Copy code to $(APP_DIR)
+        inputs:
+          sshEndpoint: $(SSH_CONNECTION)
+          sourceFolder: '$(Build.SourcesDirectory)'
+          contents: '**'
+          targetFolder: '$(APP_DIR)'
 
-- task: SSH@0
-  displayName: 'Run Migrations on backend VM'
-  inputs:
-    sshEndpoint: 'backendvm-ssh'
-    runOptions: 'commands'
-    commands: |
-      set -e
-      cd $(APP_DIR)/fundoo
-      source ../venv/bin/activate
-      python3 manage.py makemigrations
-      python3 manage.py migrate
+      # 3) ensure venv
+      - task: SSH@0
+        displayName: Ensure Python venv exists
+        inputs:
+          sshEndpoint: $(SSH_CONNECTION)
+          runOptions: inline
+          inline: |
+            set -e
+            cd $(APP_DIR)
+            if [ ! -d venv ]; then
+              python3 -m venv venv
+            fi
 
-- task: SSH@0
-  displayName: 'Restart chatapp.service'
-  inputs:
-    sshEndpoint: 'backendvm-ssh'
-    runOptions: 'commands'
-    commands: |
-      sudo systemctl restart chatapp.service
+      # 4) install deps
+      - task: SSH@0
+        displayName: Install Python dependencies
+        inputs:
+          sshEndpoint: $(SSH_CONNECTION)
+          runOptions: inline
+          inline: |
+            set -e
+            cd $(APP_DIR)
+            source venv/bin/activate
+            pip install -r requirements.txt
+            deactivate
+
+      # 5) migrations
+      - task: SSH@0
+        displayName: Run Django migrations
+        inputs:
+          sshEndpoint: $(SSH_CONNECTION)
+          runOptions: inline
+          inline: |
+            set -e
+            cd $(APP_DIR)/fundoo
+            source ../venv/bin/activate
+            python3 manage.py makemigrations
+            python3 manage.py migrate
+            deactivate
+
+      # 6) restart service
+      - task: SSH@0
+        displayName: Restart chatapp service
+        inputs:
+          sshEndpoint: $(SSH_CONNECTION)
+          runOptions: inline
+          inline: |
+            sudo systemctl restart $(SERVICE_NAME)
