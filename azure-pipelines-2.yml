@@ -1,0 +1,34 @@
+# File: .azure/pipelines/build-pipeline.yml
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  name: remote-agrnt-pool
+
+variables:
+  APP_DIR: '/app'
+
+stages:
+- stage: Build
+  displayName: 'Build & Package'
+  jobs:
+  - job: PackageCode
+    displayName: 'Checkout & Publish Artifact'
+    steps:
+
+      - checkout: self
+        clean: true
+
+      # (Optional) run tests or lint here
+      # - script: pytest
+      #   displayName: 'Run tests'
+
+      # Publish everything as a pipeline artifact
+      - task: PublishPipelineArtifact@1
+        displayName: 'Publish app code artifact'
+        inputs:
+          targetPath: '$(Build.SourcesDirectory)'   # your repo root
+          artifact: 'chatapp-code'
+          publishLocation: 'pipeline'
